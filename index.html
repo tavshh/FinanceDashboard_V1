@@ -225,6 +225,20 @@
   .refresh-btn { position: fixed; bottom: 24px; right: 24px; background: var(--accent); border: none; border-radius: 50%; color: var(--bg); cursor: pointer; font-size: 1.2rem; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,229,255,0.3); transition: all 0.2s; z-index: 100; }
   .refresh-btn:hover { transform: scale(1.1); }
   
+  .debt-pay-calendar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .dpc-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 58px; flex: 1; max-width: 80px; }
+  .dpc-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: center; }
+  .dpc-btn { width: 100%; border: 1px solid; border-radius: 6px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.62rem; padding: 5px 2px; text-align: center; transition: all 0.18s; }
+  .dpc-btn.paid { background: rgba(46,213,115,0.15); border-color: var(--success); color: var(--success); }
+  .dpc-btn.pending { background: rgba(255,107,107,0.1); border-color: var(--accent2); color: var(--accent2); }
+  .dpc-btn.inactive { background: transparent; border-color: var(--border); color: var(--muted); cursor: default; }
+  .debt-dates-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .debt-date-field { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .debt-date-field label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+  .debt-date-field input { background: transparent; border: none; color: var(--text); font-family: 'DM Mono', monospace; font-size: 1.1rem; width: 100%; text-align: center; padding: 0; }
+  .debt-date-field input:focus { outline: none; }
+  .debt-date-field .day-hint { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 2px; }
+
   @media (max-width: 900px) { 
     .main-grid { grid-template-columns: 1fr; } 
     h1 { font-size: 2rem; } 
@@ -244,20 +258,31 @@
   </header>
 
   <div class="salary-row" onclick="goToTab('ingresos','tab-btn-ingresos')" title="Ir a Ingresos">
-    <div class="salary-label">💰 Ingreso Total Mensual Neto</div>
-    <div class="salary-input" id="total-income-display">$0.00</div>
-    <div style="font-size:0.72rem;color:var(--muted); text-align: right;">MXN / mes <br>(Clic para gestionar)</div>
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+      <span style="font-size:1.2rem;line-height:1;flex-shrink:0;">💰</span>
+      <div style="min-width:0;">
+        <div class="salary-label" style="min-width:unset;flex:unset;margin-bottom:2px;">Ingreso Total Mensual Neto</div>
+        <div style="font-size:0.65rem;color:var(--muted);letter-spacing:0.06em;">Clic para gestionar fuentes</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <div style="text-align:right;">
+        <div class="salary-input" id="total-income-display" style="display:block;text-align:right;">$0.00</div>
+        <div style="font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">MXN / mes</div>
+      </div>
+      <span style="color:var(--muted);font-size:0.75rem;">→</span>
+    </div>
   </div>
 
   <!-- Fila superior: resumen (sin destino de navegación) -->
   <div class="kpi-summary-row">
     <div class="kpi yellow">
-      <div class="kpi-label">Total comprometido</div>
+      <div class="kpi-label">Total comprometido · <span id="kpi-month-label" style="color:var(--accent3);font-style:normal;text-transform:none;letter-spacing:0;">—</span></div>
       <div class="kpi-value" id="kpi-total">$0</div>
       <div class="kpi-sub" id="kpi-pct">% del ingreso</div>
     </div>
     <div class="kpi green">
-      <div class="kpi-label">Disponible estimado</div>
+      <div class="kpi-label">Disponible estimado · <span id="kpi-month-label2" style="color:var(--accent4);font-style:normal;text-transform:none;letter-spacing:0;">—</span></div>
       <div class="kpi-value" id="kpi-free">$0</div>
       <div class="kpi-sub" id="kpi-free-sub">ingresa tu sueldo arriba</div>
     </div>
@@ -537,6 +562,11 @@
   </div>
 
   <div id="tab-deudas" class="tab-content">
+    <div class="card full-width" style="margin-bottom:20px;">
+      <div class="card-title">Calendario de Fechas TDC — Mes Actual</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:16px;">Vista rápida de cortes y fechas límite de pago de todas tus tarjetas este mes. Configura los días en cada tarjeta abajo.</div>
+      <div id="tdc-dates-calendar" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+    </div>
     <div class="card full-width">
       <div class="card-title">Tarjetas de Crédito</div>
       <div id="debts-container"></div>
@@ -545,6 +575,27 @@
   </div>
 
   <div id="tab-graficas" class="tab-content">
+    <!-- LÍNEA DE TIEMPO DE PAGOS MENSUALES -->
+    <div class="card full-width" style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
+        <div class="card-title" style="margin-bottom:0;">Pagos totales por mes</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn" style="padding:5px 14px;border-color:var(--accent3);color:var(--accent3);" onclick="shiftPayTimeline(-1)" title="Mes anterior">◀</button>
+          <span id="pay-tl-month-label" style="font-family:'DM Serif Display',serif;font-size:1.15rem;color:var(--accent3);min-width:90px;text-align:center;"></span>
+          <button class="btn" style="padding:5px 14px;border-color:var(--accent3);color:var(--accent3);" onclick="shiftPayTimeline(1)" title="Mes siguiente">▶</button>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:16px;">Total comprometido: deudas fijas + cuotas TDC. Desliza para explorar meses.</div>
+
+      <!-- Tarjeta de resumen del mes activo -->
+      <div id="pay-tl-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;"></div>
+
+      <!-- Scroll horizontal de meses -->
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;">
+        <div id="pay-tl-months-row" style="display:flex;gap:10px;min-width:max-content;padding:2px 2px 8px;"></div>
+      </div>
+    </div>
+
     <div class="main-grid">
       <div class="card">
         <div class="card-title">Distribución total del gasto mensual</div>
@@ -556,12 +607,15 @@
       </div>
       <div class="card full-width">
         <div class="card-title">Proyección de pago de deudas (18 meses)</div>
-        <div class="chart-wrap" style="height:320px"><canvas id="proj-chart"></canvas></div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Saldo restante por tarjeta mes a mes. Usa el scroll horizontal para explorar.</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+          <div style="min-width:640px;height:320px;position:relative;"><canvas id="proj-chart"></canvas></div>
+        </div>
       </div>
       
       <div class="card full-width">
         <div class="card-title">Mapa de Evolución Detallada por Categorías</div>
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Filtra por tipo de movimiento y ajusta el periodo para visualizar su comportamiento en el tiempo. Las burbujas reflejan el volumen del monto económico.</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Filtra por tipo de movimiento y ajusta el periodo para visualizar su comportamiento en el tiempo.</div>
 
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -595,7 +649,9 @@
           </div>
         </div>
 
-        <div class="chart-wrap" style="height:400px"><canvas id="all-expenses-chart"></canvas></div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+          <div style="min-width:600px;height:400px;position:relative;"><canvas id="all-expenses-chart"></canvas></div>
+        </div>
       </div>
     </div>
   </div>
@@ -727,11 +783,11 @@ let services = [
 ];
 
 let debts = [
-  { id:1, name:'MercadoPago', total:10174.03, months:7, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#00e5ff', note:'Pago fijo $1,583 marzo-julio.', monthlyAmounts:[] },
-  { id:2, name:'Nu',          total:4787.56,  months:2, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#a855f7', note:'Saldar en 2 meses.', monthlyAmounts:[] },
-  { id:3, name:'Banamex',     total:15901.11, months:3, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#f97316', note:'Pagos a 3 meses.', monthlyAmounts:[] },
-  { id:4, name:'BBVA',        total:4038.48,  months:2, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#3b82f6', note:'Saldar en 2 meses.', monthlyAmounts:[] },
-  { id:5, name:'HSBC',        total:31230.86, months:8, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#ef4444', note:'Compra compartida.', monthlyAmounts:[] },
+  { id:1, name:'MercadoPago', total:10174.03, months:7, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#00e5ff', note:'Pago fijo $1,583 marzo-julio.', monthlyAmounts:[], cutDay:0, payDay:0, payments:{} },
+  { id:2, name:'Nu',          total:4787.56,  months:2, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#a855f7', note:'Saldar en 2 meses.', monthlyAmounts:[], cutDay:0, payDay:0, payments:{} },
+  { id:3, name:'Banamex',     total:15901.11, months:3, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#f97316', note:'Pagos a 3 meses.', monthlyAmounts:[], cutDay:0, payDay:0, payments:{} },
+  { id:4, name:'BBVA',        total:4038.48,  months:2, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#3b82f6', note:'Saldar en 2 meses.', monthlyAmounts:[], cutDay:0, payDay:0, payments:{} },
+  { id:5, name:'HSBC',        total:31230.86, months:8, mode:'auto', autoSub:'months', fixedMonthly:0, color:'#ef4444', note:'Compra compartida.', monthlyAmounts:[], cutDay:0, payDay:0, payments:{} },
 ];
 
 let hormigaData = {};
@@ -758,7 +814,15 @@ function loadStoredData() {
       if (p.incomes) incomes = p.incomes;
       if (p.userCats) userCats = p.userCats;
       if (p.services) services = p.services;
-      if (p.debts) debts = p.debts;
+      if (p.debts) {
+        debts = p.debts;
+        // Migrate old debts without new fields
+        debts.forEach(d => {
+          if (d.cutDay === undefined) d.cutDay = 0;
+          if (d.payDay === undefined) d.payDay = 0;
+          if (d.payments === undefined) d.payments = {};
+        });
+      }
       if (p.hormigaData) hormigaData = p.hormigaData;
       if (p.hormigaCatBadges) hormigaCatBadges = p.hormigaCatBadges;
       if (p.nextIncomeId) nextIncomeId = p.nextIncomeId;
@@ -895,11 +959,12 @@ function goToTab(tab, btnId) {
   setTimeout(() => {
     if (tabEl) tabEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (tab === 'gastos') { renderCatChart(); renderCatManager(); }
-    if (tab === 'graficas') { renderDistChart(); renderDebtChart(); renderProjChart(); renderAllExpensesChart(); }
+    if (tab === 'graficas') { renderDistChart(); renderDebtChart(); renderProjChart(); renderAllExpensesChart(); renderPayTimeline(); }
     if (tab === 'salud') { renderHealthRing(); renderHealthCompareChart(); }
     if (tab === 'timeline') renderTimeline();
     if (tab === 'hormiga') { renderHormigaCharts(); renderHormigaCatBadges(); renderHormigaMonths(); renderHormigaEntries(); }
     if (tab === 'ingresos') renderIncomesQuick();
+    if (tab === 'deudas') { renderDebts(); renderTdcCalendar(); }
   }, 50);
 }
 
@@ -1101,6 +1166,7 @@ function renderDebts() {
   if(!cont) return;
   cont.innerHTML = '';
   debts.forEach(d => {
+    if (!d.payments) d.payments = {};
     let effectiveMonths, effectiveMonthly;
     if (d.mode === 'auto') {
       if (d.autoSub === 'monthly') {
@@ -1112,7 +1178,6 @@ function renderDebts() {
     } else {
       effectiveMonths = d.monthlyAmounts.length; effectiveMonthly = d.monthlyAmounts[0] || 0;
     }
-    const paid = Math.min(100, d.total > 0 ? (effectiveMonthly * effectiveMonths) / d.total * 100 : 0).toFixed(0);
 
     const autoSub = d.autoSub || 'months';
     const autoMonthly = d.months > 0 ? (d.total / d.months) : 0;
@@ -1186,9 +1251,83 @@ function renderDebts() {
         ${manualGrid}
       </div>`;
 
+    // Determine months this debt is active
+    const isMonthlyMode = d.mode === 'auto' && (d.autoSub||'months') === 'monthly';
+    const schForPay = isMonthlyMode ? debtScheduleFromMonthly(d) : null;
+    const totalActiveMonths = d.mode === 'manual'
+      ? d.monthlyAmounts.filter(v=>v>0).length
+      : isMonthlyMode ? (schForPay ? schForPay.months : 0) : (d.months || 0);
+
+    // Build payment calendar cells (up to 18 months)
+    const visibleMonths = Math.min(Math.max(totalActiveMonths, 1), 18);
+    const nowKey = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; })();
+    let payCalendarHTML = '';
+    const paidCount = Object.values(d.payments||{}).filter(Boolean).length;
+    
+    if (totalActiveMonths > 0) {
+      const cells = [];
+      for (let i = 0; i < visibleMonths; i++) {
+        const mKey = getDebtMonthKey(i);
+        const mLabel = getMonthLabel(i);
+        let pay = 0;
+        if (d.mode === 'manual') pay = d.monthlyAmounts[i] || 0;
+        else if (isMonthlyMode) pay = schForPay ? (schForPay.schedule[i] || 0) : 0;
+        else pay = i < d.months ? d.total / d.months : 0;
+
+        const isActive = pay > 0;
+        const isPaid = !!(d.payments && d.payments[mKey]);
+        const isCurrent = mKey === nowKey;
+
+        let cls = 'dpc-btn inactive';
+        let icon = '—';
+        if (isActive) {
+          cls = isPaid ? 'dpc-btn paid' : 'dpc-btn pending';
+          icon = isPaid ? '✓' : (isCurrent ? '⏳' : fmt(pay).replace('$',''));
+        }
+        const onclick = isActive ? `onclick="toggleDebtPayment(${d.id},'${mKey}')"` : '';
+        const currentStyle = isCurrent && isActive ? `box-shadow:0 0 0 2px ${d.color};` : '';
+        cells.push(`<div class="dpc-cell"><div class="dpc-label">${mLabel}</div><div class="${cls}" style="${currentStyle}" ${onclick} title="${isActive?(isPaid?'✓ Pagado — clic para desmarcar':'Clic para marcar como pagado'):'Sin pago este mes'}">${icon}</div></div>`);
+      }
+      payCalendarHTML = `
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">Control de pagos</div>
+            <div style="display:flex;gap:10px;font-size:0.65rem;">
+              <span style="color:var(--success);">✓ ${paidCount} pagado${paidCount!==1?'s':''}</span>
+              <span style="color:var(--accent2);">⏳ ${totalActiveMonths - paidCount} pendiente${(totalActiveMonths-paidCount)!==1?'s':''}</span>
+            </div>
+          </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+            <div class="debt-pay-calendar" style="flex-wrap:nowrap;min-width:max-content;">${cells.join('')}</div>
+          </div>
+          <div style="font-size:0.62rem;color:var(--muted);margin-top:8px;">Toca un mes para marcar/desmarcar el pago como realizado.</div>
+        </div>`;
+    }
+
+    // Cut & pay day fields
+    const MONTHS_ES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const nowDate = new Date();
+    const cutDayHint = d.cutDay > 0 ? `Próximo corte: ${d.cutDay} ${MONTHS_ES_SHORT[nowDate.getMonth()]}` : 'Sin configurar';
+    const payDayHint = d.payDay > 0 ? `Próximo pago: ${d.payDay} ${MONTHS_ES_SHORT[nowDate.getMonth()]}` : 'Sin configurar';
+    const datesHTML = `
+      <div class="debt-dates-row">
+        <div class="debt-date-field" style="border-top:3px solid ${d.color}88;">
+          <label>📅 Día de corte</label>
+          <input type="number" inputmode="numeric" min="1" max="31" value="${d.cutDay||''}" placeholder="ej. 15" onchange="updateDebtField(${d.id},'cutDay',this.value)">
+          <div class="day-hint">${cutDayHint}</div>
+        </div>
+        <div class="debt-date-field" style="border-top:3px solid ${d.color}88;">
+          <label>💳 Día límite de pago</label>
+          <input type="number" inputmode="numeric" min="1" max="31" value="${d.payDay||''}" placeholder="ej. 25" onchange="updateDebtField(${d.id},'payDay',this.value)">
+          <div class="day-hint">${payDayHint}</div>
+        </div>
+      </div>`;
+
+    // Progress
+    const paid_pct = Math.min(100, totalActiveMonths > 0 ? (paidCount / totalActiveMonths * 100) : 0).toFixed(0);
+
     const div = document.createElement('div');
     div.className = 'debt-item';
-    
     div.innerHTML = `
       <div class="debt-header">
         <div style="display:flex;align-items:center;gap:10px;flex:1 1 180px;">
@@ -1200,15 +1339,17 @@ function renderDebts() {
           <button class="btn btn-danger" onclick="removeDebt(${d.id})">✕</button>
         </div>
       </div>
-      <div class="mode-toggle">
+      ${datesHTML}
+      <div class="mode-toggle" style="margin-top:14px;">
         <div class="mode-btn ${d.mode==='auto'?'active':''}" onclick="toggleDebtMode(${d.id},'auto')">⚡ Auto</div>
         <div class="mode-btn ${d.mode==='manual'?'active':''}" onclick="toggleDebtMode(${d.id},'manual')">✏️ Manual (mes a mes)</div>
       </div>
       ${d.mode==='auto' ? autoFieldsHTML : manualFieldsHTML}
-      <div style="display:flex;align-items:center;gap:10px;font-size:0.72rem;color:var(--muted);margin-top:12px">
-        <span>Progreso estimado</span>
-        <div class="progress-bar-wrap" style="flex:1"><div class="progress-bar" style="width:${paid}%;background:${d.color}"></div></div>
-        <span style="color:${d.color}">${paid}%</span>
+      ${payCalendarHTML}
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.72rem;color:var(--muted);margin-top:14px">
+        <span>Pagos realizados</span>
+        <div class="progress-bar-wrap" style="flex:1"><div class="progress-bar" style="width:${paid_pct}%;background:${paidCount>0?'var(--success)':d.color}"></div></div>
+        <span style="color:${paidCount>0?'var(--success)':d.color}">${paid_pct}%</span>
       </div>
     `;
     cont.appendChild(div);
@@ -1224,12 +1365,97 @@ function toggleDebtMode(id, mode) {
   }
   recalculate();
 }
+
+function renderTdcCalendar() {
+  const el = document.getElementById('tdc-dates-calendar'); if (!el) return;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const monthName = MONTHS_ES[now.getMonth()];
+
+  // Build horizontal timeline: 31 days
+  const days = Array.from({length: daysInMonth}, (_,i) => i+1);
+  const events = []; // {day, type:'corte'|'pago', debt}
+  debts.forEach(d => {
+    if (d.cutDay > 0 && d.cutDay <= daysInMonth) events.push({day: d.cutDay, type: 'corte', debt: d});
+    if (d.payDay > 0 && d.payDay <= daysInMonth) events.push({day: d.payDay, type: 'pago', debt: d});
+  });
+
+  if (debts.every(d => !d.cutDay && !d.payDay)) {
+    el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted);font-size:0.82rem;">Configura los días de corte y pago en cada tarjeta para ver el calendario aquí.</div>`;
+    return;
+  }
+
+  // Timeline bar
+  const today = now.getDate();
+  let barHtml = `<div style="position:relative;min-width:${daysInMonth*34}px;height:80px;margin-bottom:8px;">`;
+  // Day ticks
+  days.forEach(d => {
+    const isToday = d === today;
+    barHtml += `<div style="position:absolute;left:${(d-1)*34}px;top:0;width:32px;text-align:center;">
+      <div style="font-size:0.55rem;color:${isToday?'var(--accent)':'var(--muted)'};margin-bottom:2px;font-weight:${isToday?'600':'400'}">${d}</div>
+      <div style="width:1px;height:6px;background:${isToday?'var(--accent)':'var(--border)'};margin:0 auto;"></div>
+    </div>`;
+  });
+  // Horizontal base line
+  barHtml += `<div style="position:absolute;left:0;right:0;top:18px;height:2px;background:var(--border);border-radius:1px;"></div>`;
+  // Today marker
+  barHtml += `<div style="position:absolute;left:${(today-1)*34+15}px;top:14px;width:4px;height:10px;background:var(--accent);border-radius:2px;"></div>`;
+  // Events
+  events.forEach(ev => {
+    const leftPx = (ev.day-1)*34 + 4;
+    const isCorte = ev.type === 'corte';
+    const color = ev.debt.color;
+    const icon = isCorte ? '✂' : '💳';
+    const label = isCorte ? 'Corte' : 'Pago';
+    barHtml += `<div title="${ev.debt.name} — ${label} día ${ev.day}" style="position:absolute;left:${leftPx}px;top:24px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default;">
+      <div style="width:24px;height:24px;border-radius:50%;background:${color}22;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-size:0.75rem;">${icon}</div>
+      <div style="font-size:0.5rem;color:${color};white-space:nowrap;max-width:40px;overflow:hidden;text-overflow:ellipsis;text-align:center;">${ev.debt.name}</div>
+    </div>`;
+  });
+  barHtml += `</div>`;
+
+  // Legend row
+  const legendItems = debts.filter(d => d.cutDay || d.payDay).map(d => {
+    const parts = [];
+    if (d.cutDay) parts.push(`✂ día ${d.cutDay}`);
+    if (d.payDay) parts.push(`💳 día ${d.payDay}`);
+    return `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid ${d.color}44;border-left:3px solid ${d.color};border-radius:6px;padding:6px 10px;white-space:nowrap;">
+      <span style="color:${d.color};font-family:'DM Serif Display',serif;font-size:0.88rem;">${d.name}</span>
+      <span style="font-size:0.65rem;color:var(--muted);">${parts.join(' · ')}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">${monthName} ${now.getFullYear()}</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;">${barHtml}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${legendItems}</div>
+  `;
+}
 function toggleDebtAutoSub(id, sub) { const d = debts.find(x => x.id===id); if (d) { d.autoSub = sub; recalculate(); } }
 
 function updateDebtField(id, key, val) {
   const d = debts.find(x => x.id===id); if (!d) return;
-  if (['total','months','fixedMonthly'].includes(key)) d[key] = parseFloat(val)||0; else d[key] = val;
+  if (['total','months','fixedMonthly','cutDay','payDay'].includes(key)) d[key] = parseFloat(val)||0; else d[key] = val;
   recalculate();
+}
+
+function toggleDebtPayment(id, monthKey) {
+  const d = debts.find(x => x.id === id); if (!d) return;
+  if (!d.payments) d.payments = {};
+  if (d.payments[monthKey]) {
+    delete d.payments[monthKey];
+  } else {
+    d.payments[monthKey] = true;
+  }
+  recalculate();
+}
+
+function getDebtMonthKey(monthIndex) {
+  // monthIndex 0 = Mar 2026
+  const base = new Date(2026, 2, 1);
+  base.setMonth(base.getMonth() + monthIndex);
+  return `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
 }
 function updateDebtMonthly(id, idx, val) {
   const d = debts.find(x => x.id===id); if (!d) return;
@@ -1241,7 +1467,7 @@ function addManualMonth(id) { const d = debts.find(x => x.id===id); if (d) { d.m
 function removeManualMonth(id) { const d = debts.find(x => x.id===id); if (d && d.monthlyAmounts.length > 1) { d.monthlyAmounts.pop(); recalculate(); } }
 function addDebt() {
   const colors = ['#22d3ee','#c084fc','#fb923c','#4ade80','#f472b6','#a3e635'];
-  debts.push({id:nextDebtId++, name:'Nueva tarjeta', total:0, months:3, mode:'auto', autoSub:'months', fixedMonthly:0, color:colors[debts.length%colors.length], note:'', monthlyAmounts:[]});
+  debts.push({id:nextDebtId++, name:'Nueva tarjeta', total:0, months:3, mode:'auto', autoSub:'months', fixedMonthly:0, color:colors[debts.length%colors.length], note:'', monthlyAmounts:[], cutDay:0, payDay:0, payments:{}});
   recalculate();
 }
 function removeDebt(id) { debts = debts.filter(x => x.id!==id); recalculate(); }
@@ -1532,8 +1758,9 @@ function renderDebtChart() {
 }
 
 function renderProjChart() {
-  const ctx = document.getElementById('proj-chart').getContext('2d'); destroyChart(projChart);
-  const projLabels = ['Feb 26', ...Array.from({length:12},(_,i)=>getMonthLabel(i))];
+  const canvas = document.getElementById('proj-chart'); if(!canvas) return;
+  const ctx = canvas.getContext('2d'); destroyChart(projChart);
+  const projLabels = ['Inicio', ...Array.from({length:12},(_,i)=>getMonthLabel(i))];
   const datasets = debts.map(d => {
     let remaining = d.total; const vals = [d.total];
     const isMonthlyMode = d.mode === 'auto' && (d.autoSub||'months') === 'monthly';
@@ -1543,11 +1770,11 @@ function renderProjChart() {
       let pay = d.mode === 'manual' ? (d.monthlyAmounts[i] || 0) : isMonthlyMode ? (sch.schedule[i] || 0) : (d.months > 0 ? d.total / d.months : 0);
       if (i >= maxMonths || remaining <= 0) { vals.push(0); remaining = 0; } else { remaining = Math.max(0, remaining - pay); vals.push(parseFloat(remaining.toFixed(2))); }
     }
-    return {label:d.name, data:vals, borderColor:d.color, backgroundColor:d.color+'15', fill:false, tension:0.3, pointRadius:3, borderWidth:2};
+    return {label:d.name, data:vals, backgroundColor:d.color+'55', borderColor:d.color, borderWidth:2, borderRadius:4, borderSkipped:false};
   });
   projChart = new Chart(ctx, {
-    type:'line', data:{labels: projLabels, datasets},
-    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'top',labels:{color:'#5a6a85',font:{family:'DM Mono',size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`}}}, scales:{x:{ticks:{color:'#5a6a85',font:{family:'DM Mono',size:10}},grid:{color:'#1e2d45'}},y:{ticks:{color:'#5a6a85',font:{family:'DM Mono',size:11},callback:v=>'$'+(v/1000).toFixed(1)+'k'},grid:{color:'#1e2d45'}}}}
+    type:'bar', data:{labels: projLabels, datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'top',labels:{color:'#5a6a85',font:{family:'DM Mono',size:11},boxWidth:12,padding:12}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`, footer: items => ` Total pendiente: ${fmt(items.reduce((a,i)=>a+i.raw,0))}`}}}, scales:{x:{ticks:{color:'#5a6a85',font:{family:'DM Mono',size:10},maxRotation:30},grid:{color:'#1e2d45'}},y:{ticks:{color:'#5a6a85',font:{family:'DM Mono',size:11},callback:v=>'$'+(v/1000).toFixed(1)+'k'},grid:{color:'#1e2d45'}}}}
   });
 }
 
@@ -1599,17 +1826,14 @@ function renderAllExpensesChart() {
 
   if (showIng) {
     incomes.forEach(inc => {
-      const data = monthKeys.map((k, idx) => ({ x: labels[idx], y: inc.amount, r: getRadius(inc.amount) }));
-      datasets.push({ label: inc.name + ' (Ingreso)', data, backgroundColor: 'rgba(107,203,119,0.4)', borderColor: '#6bcb77', borderWidth: 2 });
+      const data = monthKeys.map(() => inc.amount);
+      datasets.push({ label: inc.name + ' (Ingreso)', data, backgroundColor: 'rgba(107,203,119,0.15)', borderColor: '#6bcb77', borderWidth: 2, pointRadius: 3, tension: 0.3, fill: false });
     });
   }
 
   if (showFij) {
-    services.forEach(s => {
-      const amt = monthlyAmount(s);
-      const data = monthKeys.map((k, idx) => ({ x: labels[idx], y: amt, r: getRadius(amt) }));
-      datasets.push({ label: s.name + ' (Fijo)', data, backgroundColor: catColor(s.cat)+'66', borderColor: catColor(s.cat), borderWidth: 2 });
-    });
+    const fixedByMonth = monthKeys.map(() => totalMonthlyServices());
+    datasets.push({ label: 'Gastos Fijos', data: fixedByMonth, backgroundColor: 'rgba(0,229,255,0.1)', borderColor: '#00e5ff', borderWidth: 2, pointRadius: 3, tension: 0.3, fill: false });
   }
 
   if (showTdc) {
@@ -1618,7 +1842,7 @@ function renderAllExpensesChart() {
       const isMonthlyMode = d.mode === 'auto' && (d.autoSub||'months') === 'monthly';
       const sch = isMonthlyMode ? debtScheduleFromMonthly(d) : null;
       
-      monthKeys.forEach((k, idx) => {
+      monthKeys.forEach((k) => {
          const [yr, mn] = k.split('-').map(Number);
          const offset = (yr - 2026) * 12 + (mn - 3);
          let pay = 0;
@@ -1627,9 +1851,9 @@ function renderAllExpensesChart() {
            else if (isMonthlyMode) pay = sch.schedule[offset] || 0;
            else pay = offset < d.months ? (d.total/d.months) : 0;
          }
-         data.push({ x: labels[idx], y: pay, r: getRadius(pay) });
+         data.push(pay);
       });
-      datasets.push({ label: d.name + ' (TDC)', data, backgroundColor: d.color+'66', borderColor: d.color, borderWidth: 2 });
+      datasets.push({ label: d.name + ' (TDC)', data, backgroundColor: d.color+'22', borderColor: d.color, borderWidth: 2, pointRadius: 3, tension: 0.3, fill: false });
     });
   }
 
@@ -1637,24 +1861,24 @@ function renderAllExpensesChart() {
     const hKeys = sortedHormigaKeys().filter(k=>totalHormigaMonth(k)>0);
     const hAvg = hKeys.length ? hKeys.reduce((a,k)=>a+totalHormigaMonth(k),0)/hKeys.length : 0;
     
-    const data = monthKeys.map((k, idx) => {
-      const v = hormigaData[k] ? totalHormigaMonth(k) : hAvg;
-      return { x: labels[idx], y: v, r: getRadius(v) };
+    const data = monthKeys.map((k) => {
+      return hormigaData[k] ? totalHormigaMonth(k) : hAvg;
     });
-    datasets.push({ label: 'Hormiga (Mes/Promedio)', data, backgroundColor: 'rgba(245,158,11,0.4)', borderColor: 'var(--hormiga)', borderWidth: 2 });
+    datasets.push({ label: 'Hormiga (Mes/Promedio)', data, backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'var(--hormiga)', borderWidth: 2, pointRadius: 3, tension: 0.3, fill: false });
   }
 
   allExpensesChart = new Chart(ctx, {
-    type: 'bubble',
+    type: 'line',
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: { 
-        legend: { position: 'bottom', labels: { color: '#5a6a85', font: { family: 'DM Mono', size: 10 }, boxWidth: 12, padding:10 } }, 
-        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmt(c.raw.y)}` } } 
+        legend: { position: 'bottom', labels: { color: '#5a6a85', font: { family: 'DM Mono', size: 10 }, boxWidth: 12, padding: 10 } }, 
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmt(c.raw)}` } } 
       },
       scales: { 
-        x: { type: 'category', ticks: { color: '#5a6a85', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#1e2d45' } }, 
+        x: { ticks: { color: '#5a6a85', font: { family: 'DM Mono', size: 10 }, maxRotation: 45 }, grid: { color: '#1e2d45' } }, 
         y: { ticks: { color: '#5a6a85', font: { family: 'DM Mono', size: 10 }, callback: v => '$' + (v / 1000).toFixed(1) + 'k' }, grid: { color: '#1e2d45' } } 
       }
     }
@@ -1886,6 +2110,12 @@ function updateKPIs() {
   document.getElementById('kpi-free').textContent = salary>0?fmt(libre):'—';
   document.getElementById('kpi-free-sub').textContent = salary>0?(libre<0?'⚠️ Déficit mensual':'después de todos los compromisos'):'Ingresa tus fuentes de dinero';
   document.getElementById('kpi-free').style.color = libre>=0?'var(--accent4)':'var(--danger)';
+  // Live month label
+  const now = new Date();
+  const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const monthLabel = MONTHS_ES[now.getMonth()];
+  const m1 = document.getElementById('kpi-month-label'); if(m1) m1.textContent = monthLabel;
+  const m2 = document.getElementById('kpi-month-label2'); if(m2) m2.textContent = monthLabel;
   
   const alertEl = document.getElementById('health-alert');
   if (salary>0 && libre<0) { alertEl.style.display='flex'; alertEl.className='alert alert-danger'; alertEl.innerHTML=`<div class="dot" style="background:var(--danger)"></div><strong>Déficit mensual de ${fmt(Math.abs(libre))}</strong>. Tus compromisos superan tu ingreso.`; }
@@ -1894,10 +2124,95 @@ function updateKPIs() {
   else { alertEl.style.display='none'; }
 }
 
+// ─────────────────────────────────────────────────────────────
+//  LÍNEA DE TIEMPO DE PAGOS MENSUALES (top de Gráficas)
+// ─────────────────────────────────────────────────────────────
+let _payTlKey = '2026-03';
+
+function shiftPayTimeline(delta) {
+  _payTlKey = shiftKey(_payTlKey, delta);
+  renderPayTimeline();
+}
+
+function renderPayTimeline() {
+  const labelEl = document.getElementById('pay-tl-month-label');
+  const rowEl = document.getElementById('pay-tl-months-row');
+  const summaryEl = document.getElementById('pay-tl-summary');
+  if (!labelEl || !rowEl || !summaryEl) return;
+
+  const startKey = shiftKey(_payTlKey, -2);
+  const monthKeys = [];
+  for (let i = 0; i < 12; i++) monthKeys.push(shiftKey(startKey, i));
+
+  labelEl.textContent = keyToLabel(_payTlKey);
+  const fixed = totalMonthlyServices();
+
+  const getMonthTotal = (key) => {
+    const [yr, mn] = key.split('-').map(Number);
+    const offset = (yr - 2026) * 12 + (mn - 3);
+    if (offset < 0) return { debt: 0, fixed, hormiga: 0, total: fixed };
+    const debt = debts.reduce((acc, d) => {
+      if (d.mode === 'manual') return acc + (d.monthlyAmounts[offset] || 0);
+      const isMonthlyMode = d.mode === 'auto' && (d.autoSub || 'months') === 'monthly';
+      if (isMonthlyMode) { const sch = debtScheduleFromMonthly(d); return acc + (sch.schedule[offset] || 0); }
+      return offset < d.months ? acc + (d.total / d.months) : acc;
+    }, 0);
+    const hormiga = totalHormigaMonth(key);
+    return { debt, fixed, hormiga, total: debt + fixed + hormiga };
+  };
+
+  const active = getMonthTotal(_payTlKey);
+  const salary = totalIncome();
+  const libre = salary - active.total;
+
+  summaryEl.innerHTML = [
+    { label: 'Gastos Fijos', val: active.fixed, color: 'var(--accent)' },
+    { label: 'Cuotas TDC', val: active.debt, color: 'var(--accent2)' },
+    { label: 'Hormiga', val: active.hormiga, color: 'var(--hormiga)' },
+    { label: 'Total comprometido', val: active.total, color: 'var(--accent3)' },
+    { label: salary > 0 ? 'Disponible' : 'Ingreso no definido', val: libre, color: libre >= 0 ? 'var(--accent4)' : 'var(--danger)' },
+  ].map(item => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+      <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:6px;">${item.label}</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:1.25rem;color:${item.color};line-height:1;">${salary > 0 || item.label !== 'Disponible' ? fmt(item.val) : '—'}</div>
+    </div>`).join('');
+
+  const allTotals = monthKeys.map(k => getMonthTotal(k).total);
+  const maxTotal = Math.max(...allTotals, 1);
+
+  rowEl.innerHTML = monthKeys.map(key => {
+    const isActive = key === _payTlKey;
+    const mt = getMonthTotal(key);
+    const fixedPct = mt.total > 0 ? Math.round((mt.fixed / mt.total) * 100) : 0;
+    const debtPct = mt.total > 0 ? Math.round((mt.debt / mt.total) * 100) : 0;
+    const horPct = Math.max(0, 100 - fixedPct - debtPct);
+
+    return `<div onclick="(()=>{_payTlKey='${key}';renderPayTimeline();})()" style="
+      min-width:118px; flex:0 0 auto;
+      background:${isActive ? 'var(--surface2)' : 'var(--surface)'};
+      border:1px solid ${isActive ? 'var(--accent3)' : 'var(--border)'};
+      border-radius:10px; padding:12px 10px; cursor:pointer;
+      transition:border-color 0.2s,transform 0.15s;
+      transform:${isActive ? 'translateY(-3px)' : 'translateY(0)'};
+    ">
+      <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;color:${isActive ? 'var(--accent3)' : 'var(--muted)'};margin-bottom:6px;text-align:center;">${keyToLabel(key)}</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:0.95rem;color:${isActive ? 'var(--accent3)' : 'var(--text)'};text-align:center;margin-bottom:8px;">${fmt(mt.total)}</div>
+      <div style="height:6px;border-radius:3px;overflow:hidden;display:flex;gap:1px;margin-bottom:6px;">
+        <div style="width:${fixedPct}%;background:var(--accent);opacity:0.85;border-radius:3px 0 0 3px;"></div>
+        <div style="width:${debtPct}%;background:var(--accent2);opacity:0.85;"></div>
+        <div style="width:${horPct}%;background:var(--hormiga);opacity:0.85;border-radius:0 3px 3px 0;"></div>
+      </div>
+      <div style="font-size:0.58rem;color:var(--muted);text-align:center;">${mt.debt>0?fmt(mt.debt)+' TDC':mt.total>0?fmt(mt.fixed)+' fijo':'sin pagos'}</div>
+    </div>`;
+  }).join('');
+}
+
+
 function recalculate() {
   renderIncomes(); 
   renderServices();
   renderDebts();
+  renderTdcCalendar();
   updateKPIs();
   renderCatChart();
   renderDistChart();
@@ -1905,6 +2220,7 @@ function recalculate() {
   renderProjChart();
   renderAllExpensesChart(); 
   renderTimeline();
+  renderPayTimeline();
   renderHormigaMonths();
   renderHormigaCatBadges();
   renderHormigaEntries();
